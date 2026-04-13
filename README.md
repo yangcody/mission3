@@ -226,9 +226,9 @@ def compare_scores(score_cross, score_x, epsilon=EPSILON):
     if diff < epsilon:
         return "UNDECIDED"
     elif score_cross > score_x:
-        return "Cross"
+        return "A"
     else:
-        return "X"
+        return "B"
 
 
 # =========================
@@ -303,7 +303,7 @@ def run_user_mode():
     print(f"연산 시간(평균/10회): {avg_time:.3f} ms")
 
     if result == "UNDECIDED":
-        print("판정: UNDECIDED (|A-B| < epsilon)")
+        print("판정: 판정 불가 (|A-B| < epsilon)")
     else:
         print(f"판정: {result}")
 
