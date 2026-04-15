@@ -164,7 +164,7 @@ N × N = N²
 
 ---
 
-## 5. 소스코드
+## 5. 소스 코드 (main.py)
 
 main() 함수 1개로 구현함
 
@@ -174,18 +174,8 @@ import time
 
 EPSILON = 1e-9
 
-# 유틸 함수
-def normalize_label(label):
-    label = label.strip().lower()
 
-    if label in ["+", "cross"]:
-        return "Cross"
-    elif label in ["x"]:
-        return "X"
-    else:
-        raise ValueError(f"알 수 없는 라벨: {label}")
-
-def validate_matrix(matrix, size):
+def validate_matrix(matrix, size):                      # 필터/패턴 N x N 구조 체크
     if len(matrix) != size:
         return False
     for row in matrix:
@@ -193,19 +183,8 @@ def validate_matrix(matrix, size):
             return False
     return True
 
-def create_matrix(rows):
-    matrix = []
-    for line in rows:
-        row = [float(x) for x in line.split()]
-        matrix.append(row)
-    return matrix
 
-
-# =========================
-# MAC 연산
-# =========================
-
-def mac_operation(pattern, filter_matrix):
+def mac_operation(pattern, filter_matrix):              # MAC 연산
     size = len(pattern)
     total = 0.0
 
@@ -216,11 +195,7 @@ def mac_operation(pattern, filter_matrix):
     return total
 
 
-# =========================
-# 점수 비교
-# =========================
-
-def compare_scores(score_cross, score_x, epsilon=EPSILON):
+def compare_scores(score_cross, score_x, epsilon=EPSILON):  # 점수 비교
     diff = abs(score_cross - score_x)
 
     if diff < epsilon:
@@ -231,67 +206,50 @@ def compare_scores(score_cross, score_x, epsilon=EPSILON):
         return "B"
 
 
-# =========================
-# 입력 처리
-# =========================
-
-def input_matrix_3x3(prompt):
+def input_matrix_3x3(prompt):                           # 사용자 입력 검증 처리
     print(prompt)
 
-    while True:
+    while True:                                         # 입력 변환 및 데이터 구조화
         rows = []
         for _ in range(3):
             rows.append(input())
-
         try:
-            matrix = create_matrix(rows)
+            matrix = []
+            for line in rows:       
+                row = [float(x) for x in line.split()]
+                matrix.append(row)
 
             if not validate_matrix(matrix, 3):
                 print("입력 형식 오류: 각 줄에 3개의 숫자를 입력하세요.")
                 continue
-
             return matrix
 
         except ValueError:
             print("입력 형식 오류: 숫자를 입력해야 합니다.")
 
 
-# =========================
-# 성능 측정
-# =========================
-
-def measure_mac_time(pattern, filter_matrix, repeat=10):
+def measure_mac_time(pattern, filter_matrix, repeat=10):    # 연산 성능 측정
     start = time.time()
-
     for _ in range(repeat):
         mac_operation(pattern, filter_matrix)
-
     end = time.time()
-
     return (end - start) / repeat * 1000
 
 
-# =========================
-# 사용자 모드
-# =========================
-
-def run_user_mode():
+def run_user_mode():                                        # 1.사용자 모드
     print("\n#---------------------------------------")
     print("# [1] 필터 입력")
     print("#---------------------------------------")
-
     filter_a = input_matrix_3x3("필터 A 입력 (3줄)")
     filter_b = input_matrix_3x3("필터 B 입력 (3줄)")
 
     print("\n#---------------------------------------")
     print("# [2] 패턴 입력")
     print("#---------------------------------------")
-
     pattern = input_matrix_3x3("패턴 입력 (3줄)")
 
     score_a = mac_operation(pattern, filter_a)
     score_b = mac_operation(pattern, filter_b)
-
     result = compare_scores(score_a, score_b)
     avg_time = measure_mac_time(pattern, filter_a)
 
@@ -308,27 +266,7 @@ def run_user_mode():
         print(f"판정: {result}")
 
 
-# =========================
-# JSON 처리
-# =========================
-
-def safe_load_json(filepath):
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print("파일을 찾을 수 없습니다.")
-        return None
-    except json.JSONDecodeError:
-        print("JSON 형식 오류")
-        return None
-
-
-def extract_size_from_key(key):
-    return int(key.split("_")[1])
-
-
-def load_filters(data):
+def load_filters(data):                                 # 파일 내용 중 필터만 저장
     filters = {}
 
     for size_key, value in data["filters"].items():
@@ -342,16 +280,23 @@ def load_filters(data):
     return filters
 
 
-# =========================
-# JSON 평가
-# =========================
+def normalize_label(label):                             # 라벨 정규화
+    label = label.strip().lower()
 
-def evaluate_patterns(data, filters):
+    if label in ["+", "cross"]:
+        return "Cross"
+    elif label in ["x"]:
+        return "X"
+    else:
+        raise ValueError(f"알 수 없는 라벨: {label}")
+
+
+def evaluate_patterns(data, filters):                       # JSON 평가
     results = []
 
     for key, item in data["patterns"].items():
         try:
-            size = extract_size_from_key(key)
+            size = int(key.split("_")[1])
 
             if size not in filters:
                 raise ValueError("필터 없음")
@@ -367,10 +312,20 @@ def evaluate_patterns(data, filters):
             score_cross = mac_operation(pattern, filter_cross)
             score_x = mac_operation(pattern, filter_x)
 
-            predicted = compare_scores(score_cross, score_x)
+            if compare_scores(score_cross, score_x) == "A":     
+                predicted = "Cross"
+            elif compare_scores(score_cross, score_x) == "B":
+                predicted = "X"
+            else:
+                predicted = "UNDECIDED"
             expected = normalize_label(item["expected"])
 
-            status = "PASS" if predicted == expected else "FAIL"
+            if predicted == "UNDECIDED":
+                status = "FAIL (동점 규칙)"
+            elif predicted == expected:
+                status = "PASS"
+            else:
+                status = "FAIL"
 
             results.append({
                 "key": key,
@@ -391,13 +346,9 @@ def evaluate_patterns(data, filters):
     return results
 
 
-# =========================
-# 결과 출력
-# =========================
-
-def print_results(results):
+def print_results(results, filters):                                     # 결과 출력
     print("\n#---------------------------------------")
-    print("# [패턴 분석 결과]")
+    print("# [2] 패턴 분석 (라벨 정규화 적용)")
     print("#---------------------------------------")
 
     for r in results:
@@ -411,37 +362,9 @@ def print_results(results):
         print(f"X 점수: {r['score_x']}")
         print(f"판정: {r['predicted']} | expected: {r['expected']} | {r['status']}")
 
-
-def print_summary(results):
-    total = len(results)
-    passed = sum(1 for r in results if r["status"] == "PASS")
-    failed = total - passed
-
     print("\n#---------------------------------------")
-    print("# [결과 요약]")
+    print("# [3] 성능 분석 (평균/10회)")
     print("#---------------------------------------")
-    print(f"총 테스트: {total}")
-    print(f"통과: {passed}")
-    print(f"실패: {failed}")
-
-    print("\n실패 케이스:")
-    for r in results:
-        if r["status"] == "FAIL":
-            if "reason" in r:
-                print(f"- {r['key']}: {r['reason']}")
-            else:
-                print(f"- {r['key']}: 예측 불일치")
-
-
-# =========================
-# 성능 출력
-# =========================
-
-def print_performance(filters):
-    print("\n#---------------------------------------")
-    print("# [성능 분석]")
-    print("#---------------------------------------")
-
     print("크기       평균 시간(ms)    연산 횟수")
     print("-------------------------------------")
 
@@ -450,40 +373,61 @@ def print_performance(filters):
         avg_time = measure_mac_time(pattern, f["Cross"])
         print(f"{size}×{size}    {avg_time:.3f} ms    {size*size}")
 
+    total = len(results)
+    passed = sum(1 for r in results if r["status"] == "PASS")
+    failed = total - passed
 
-# =========================
-# JSON 모드
-# =========================
+    print("\n#---------------------------------------")
+    print("# [4] 결과 요약")
+    print("#---------------------------------------")
+    print(f"총 테스트: {total}")
+    print(f"통과: {passed}")
+    print(f"실패: {failed}")
 
-def run_json_mode():
-    data = safe_load_json("data.json")
+    print("\n실패 케이스:")
+    for r in results:
+        if r["status"] == "FAIL (동점 규칙)":
+            print(f"- {r['key']}: 동점(UNDECIDED) 처리 규칙에 따라 FAIL")
+        elif r["status"] == "FAIL":
+            if "reason" in r:
+                print(f"- {r['key']}: {r['reason']}")
+            else:
+                print(f"- {r['key']}: 예측 불일치")
+
+
+def run_json_mode():                                         # 2.JSON 모드
+    try:
+        with open("data.json", "r", encoding="utf-8") as f:     # JSON 읽기
+            data = json.load(f)
+    except FileNotFoundError:
+        print("파일을 찾을 수 없습니다.")
+        data = None
+    except json.JSONDecodeError:
+        print("JSON 형식 오류")
+        data = None
+
     if data is None:
         return
 
     if "filters" not in data or "patterns" not in data:
         print("JSON 구조 오류")
         return
-
+    
     filters = load_filters(data)
 
     print("\n#---------------------------------------")
-    print("# [필터 로드]")
+    print("# [1] 필터 로드")
     print("#---------------------------------------")
+
     for size in filters:
         print(f"✓ size_{size} 필터 로드 완료 (Cross, X)")
 
     results = evaluate_patterns(data, filters)
 
-    print_results(results)
-    print_performance(filters)
-    print_summary(results)
+    print_results(results, filters)
 
 
-# =========================
-# 메인
-# =========================
-
-def main():
+def main():                                              # 메인
     print("=== Mini NPU Simulator ===")
     print("1. 사용자 입력 (3x3)")
     print("2. data.json 분석")
@@ -497,7 +441,127 @@ def main():
     else:
         print("잘못된 선택")
 
-
 if __name__ == "__main__":
     main()
+```
+
+
+### 5. 필터/패턴 data 파일 (data.json)
+
+```json
+{
+  "filters": {
+    "size_5": {
+      "cross": [
+        [0,0,1,0,0],
+        [0,0,1,0,0],
+        [1,1,1,1,1],
+        [0,0,1,0,0],
+        [0,0,1,0,0]
+      ],
+      "x": [
+        [1,0,0,0,1],
+        [0,1,0,1,0],
+        [0,0,1,0,0],
+        [0,1,0,1,0],
+        [1,0,0,0,1]
+      ]
+    },
+    "size_13": {
+      "cross": [
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0]
+      ],
+      "x": [
+        [1,0,0,0,0,0,0,0,0,0,0,0,1],
+        [0,1,0,0,0,0,0,0,0,0,0,1,0],
+        [0,0,1,0,0,0,0,0,0,0,1,0,0],
+        [0,0,0,1,0,0,0,0,0,1,0,0,0],
+        [0,0,0,0,1,0,0,0,1,0,0,0,0],
+        [0,0,0,0,0,1,0,1,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,1,0,1,0,0,0,0,0],
+        [0,0,0,0,1,0,0,0,1,0,0,0,0],
+        [0,0,0,1,0,0,0,0,0,1,0,0,0],
+        [0,0,1,0,0,0,0,0,0,0,1,0,0],
+        [0,1,0,0,0,0,0,0,0,0,0,1,0],
+        [1,0,0,0,0,0,0,0,0,0,0,0,1]
+      ]
+    },
+    "size_25": {
+      "cross": [
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0]
+      ],
+      "x": [
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+        [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],
+        [0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0],
+        [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0],
+        [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],
+        [0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+        [0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0],
+        [0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
+        [0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0],
+        [0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0],
+        [0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0],
+        [0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],
+        [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1]
+      ]
+    }
+  },
+  "patterns": {
+    "size_5_1": { "input": [[0,0,1,0,0],[0,0,1,0,0],[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0]], "expected": "+" },
+    "size_5_2": { "input": [[1,0,0,0,1],[0,1,0,1,0],[0,0,1,0,0],[0,1,0,1,0],[1,0,0,0,1]], "expected": "x" },
+    "size_5_3": { "input": [[0,0,1,0,0],[0,1,1,1,0],[1,1,1,1,1],[0,1,1,1,0],[0,0,1,0,0]], "expected": "+" },
+    "size_5_4": { "input": [[1,0,0,0,1],[0,1,0,1,0],[0,0,0,0,0],[0,1,0,1,0],[1,0,0,0,1]], "expected": "x" },
+    "size_5_5": { "input": [[1,0,1,0,1],[0,1,1,1,0],[1,1,1,1,1],[0,1,1,1,0],[1,0,1,0,1]], "expected": "+" },
+    "size_5_6": { "input": [[0,0,1,0,0],[0,0,1,0,0],[1,1,1,1,1],[0,0,1,0,0],[0,0,1,0,0]], "expected": "x" }
+  }
+}
 ```
