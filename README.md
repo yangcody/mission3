@@ -446,7 +446,7 @@ if __name__ == "__main__":
 ```
 
 
-### 5. 필터/패턴 data 파일 (data.json)
+### 6. 필터/패턴 data 파일 ("data.json")
 
 ```json
 {
